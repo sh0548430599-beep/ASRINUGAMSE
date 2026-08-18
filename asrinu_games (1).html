@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASRINU GAMES</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js for sounds -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- PeerJS for Real-Time Multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap');
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background: linear-gradient(135deg, #1e3a8a, #4c1d95, #9d174d);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: white;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .stage-bg {
+            background-image: 
+                radial-gradient(ellipse at top, rgba(255, 255, 255, 0.2) 0%, transparent 60%),
+                linear-gradient(to bottom, #111827 0%, #1e1b4b 100%);
+            position: relative;
+        }
+        
+        .stage-bg::before, .stage-bg::after {
+            content: '';
+            position: absolute;
+            top: -50px;
+            width: 150px;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent);
+            transform-origin: top;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .stage-bg::before {
+            left: 10%;
+            transform: rotate(25deg);
+            animation: spotlight-left 5s ease-in-out infinite alternate;
+        }
+        
+        .stage-bg::after {
+            right: 10%;
+            transform: rotate(-25deg);
+            animation: spotlight-right 6s ease-in-out infinite alternate;
+        }
+
+        @keyframes spotlight-left {
+            0% { transform: rotate(20deg); opacity: 0.5; }
+            100% { transform: rotate(35deg); opacity: 0.8; }
+        }
+
+        @keyframes spotlight-right {
+            0% { transform: rotate(-20deg); opacity: 0.5; }
+            100% { transform: rotate(-35deg); opacity: 0.8; }
+        }
+
+        .view {
+            display: none;
+            min-height: 100vh;
+            width: 100%;
+        }
+
+        .view:not(.hidden) {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .game-btn {
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        .game-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 rgba(0,0,0,0.2);
+            filter: brightness(1.1);
+        }
+        .game-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 rgba(0,0,0,0.2);
+        }
+
+        .color-red { background-color: #e21b3c; }
+        .color-blue { background-color: #1368ce; }
+        .color-yellow { background-color: #d89e00; }
+        .color-green { background-color: #26890c; }
+
+        .thinking-bar {
+            height: 8px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+            background-size: 200% 100%;
+            animation: loadingBar 1.5s infinite;
+        }
+        @keyframes loadingBar {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+
+        .podium-place {
+            animation: riseUp 1s ease-out forwards;
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        .place-2 { animation-delay: 0.5s; }
+        .place-1 { animation-delay: 1s; }
+        .place-3 { animation-delay: 0s; }
+        
+        @keyframes riseUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #qrcode-container img {
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 4px solid white;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- מסך ראשי: כניסת שחקנים -->
+    <div id="view-player-join" class="view fade-in">
+        <div class="glass-card p-10 max-w-md w-full mx-4 text-center">
+            <h1 class="text-6xl font-black mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-white to-yellow-300 drop-shadow-lg">
+                ASRINU<br>GAMES
+            </h1>
+            
+            <div id="join-step-1">
+                <input type="number" id="pin-input" placeholder="קוד משחק" class="w-full text-center text-3xl font-bold py-4 px-6 rounded-xl text-black mb-4 border-4 border-transparent focus:border-blue-500 outline-none transition shadow-inner">
+                <button onclick="checkPin()" class="w-full bg-slate-900 text-white text-2xl font-bold py-4 rounded-xl game-btn hover:bg-slate-800">
+                    היכנס
+                </button>
+                <div id="pin-error" class="text-red-300 font-bold mt-3 hidden bg-red-900/50 p-2 rounded">קוד המשחק אינו חוקי או שהחדר סגור</div>
+            </div>
+
+            <div id="join-step-2" class="hidden">
+                <div class="flex justify-between items-center mb-4 px-2">
+                    <button onclick="backToStep1()" class="text-white/70 hover:text-white transition flex items-center font-bold">
+                        <i class="fas fa-arrow-right ml-2"></i> חזור
+                    </button>
+                    <span class="text-yellow-300 font-bold text-lg bg-black/30 px-3 py-1 rounded-lg" id="display-joined-pin"></span>
+                </div>
+                <input type="text" id="nickname-input" placeholder="הכנס כינוי..." maxlength="15" class="w-full text-center text-3xl font-bold py-4 px-6 rounded-xl text-black mb-4 border-4 border-transparent focus:border-green-500 outline-none transition shadow-inner">
+                <div class="flex gap-3">
+                    <button onclick="backToStep1()" class="w-1/3 bg-black/30 text-white text-lg font-bold py-4 rounded-xl game-btn hover:bg-black/50">
+                        חזור
+                    </button>
+                    <button onclick="joinGame()" class="w-2/3 bg-green-600 text-white text-2xl font-bold py-4 rounded-xl game-btn hover:bg-green-500">
+                        בוא נשחק!
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-6 border-t border-white/25">
+                <button onclick="requirePasswordForDashboard()" class="text-white/80 hover:text-white underline text-sm transition font-bold">
+                    אזור ניהול ויצירת משחקים
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- מסך אימות סיסמה לניהול -->
+    <div id="view-admin-login" class="view hidden fade-in">
+        <div class="glass-card p-8 max-w-md w-full mx-4 relative">
+            <button onclick="switchView('view-player-join')" class="absolute top-4 right-4 text-white/70 hover:text-white transition">
+                <i class="fas fa-arrow-right"></i> חזור
+            </button>
+            <div class="text-center mb-6 mt-4">
+                <i class="fas fa-lock text-4xl text-white/50 mb-4"></i>
+                <h2 class="text-2xl font-bold">אזור ניהול מאובטח</h2>
+            </div>
+            <input type="password" id="admin-password-input" placeholder="הכנס סיסמת ניהול" class="w-full text-center text-xl font-bold py-3 px-4 rounded-xl text-black mb-4 outline-none">
+            <button onclick="verifyAdminPassword()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl game-btn">
+                היכנס לדשבורד
+            </button>
+            <div id="admin-error" class="text-red-300 font-bold mt-3 text-center hidden">סיסמה שגויה</div>
+        </div>
+    </div>
+
+    <!-- מסך דשבורד מנהל -->
+    <div id="view-creator-dashboard" class="view hidden fade-in">
+        <div class="w-full max-w-4xl px-4 py-8 relative">
+            <div class="flex justify-between items-center mb-8 glass-card p-4">
+                <button onclick="switchView('view-player-join')" class="bg-black/30 hover:bg-black/50 text-white px-4 py-2 rounded-xl transition flex items-center font-bold">
+                    <i class="fas fa-arrow-right ml-2"></i> חזור לשחקנים
+                </button>
+                <h2 class="text-2xl font-bold tracking-wider">דשבורד ניהול</h2>
+                <button onclick="promptChangePassword()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition text-sm flex items-center">
+                    <i class="fas fa-key ml-2"></i> שנה סיסמה
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- כרטיסייה: AI -->
+                <div class="glass-card p-8 text-center hover:bg-white/5 transition group cursor-pointer" onclick="switchView('view-ai-creator')">
+                    <div class="w-20 h-20 mx-auto bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition">
+                        <i class="fas fa-robot text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-2">מחולל AI חכם</h3>
+                    <p class="text-white/70">צור חידון מושלם מכל נושא באמצעות בינה מלאכותית.</p>
+                </div>
+
+                <!-- כרטיסייה: עורך מתקדם -->
+                <div class="glass-card p-8 text-center hover:bg-white/5 transition group cursor-pointer" onclick="showEditorOptions()">
+                    <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-400 to-purple-600 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition">
+                        <i class="fas fa-edit text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-2">עורך מתקדם</h3>
+                    <p class="text-white/70">בנה או ערוך חידונים. הוסף תמונות, צלילים וקבע זמנים.</p>
+                </div>
+
+                <!-- כרטיסייה: משחק מהיר -->
+                <div class="glass-card p-8 text-center hover:bg-white/5 transition group cursor-pointer" onclick="startHostWithDemo()">
+                    <div class="w-20 h-20 mx-auto bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition">
+                        <i class="fas fa-play text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-2">הפעלת הדגמה</h3>
+                    <p class="text-white/70">התחל מיד חידון לדוגמה כדי לראות איך המערכת עובדת.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- מסך יצירת AI -->
+    <div id="view-ai-creator" class="view hidden fade-in">
+        <div class="glass-card p-8 max-w-2xl w-full mx-4 relative">
+            <button onclick="switchView('view-creator-dashboard')" class="absolute top-4 right-4 text-white/70 hover:text-white transition">
+                <i class="fas fa-arrow-right"></i> חזור
+            </button>
+            
+            <div class="text-center mb-8 mt-6">
+                <i class="fas fa-magic text-4xl text-yellow-300 mb-2"></i>
+                <h2 class="text-3xl font-bold">מחולל חידונים מבוסס Gemini</h2>
+            </div>
+            
+            <div class="space-y-4 mb-6 text-right border border-white/20 p-6 rounded-2xl bg-black/20">
+                <div class="flex gap-4 items-end">
+                    <div class="flex-1">
+                        <label class="block mb-2 text-sm text-yellow-300 font-bold">נושא החידון (למשל: "היסטוריה"):</label>
+                        <input type="text" id="ai-topic-input" class="w-full bg-black/40 border border-white/20 rounded-xl p-3 text-white placeholder-white/40 focus:outline-none focus:border-yellow-300 transition" placeholder="הקלד כאן...">
+                    </div>
+                    <div class="w-32">
+                        <label class="block mb-2 text-sm text-yellow-300 font-bold text-center">מס' שאלות:</label>
+                        <input type="number" id="ai-q-count" value="10" min="1" max="50" class="w-full bg-black/40 border border-white/20 rounded-xl p-3 text-white outline-none focus:border-yellow-300 text-center text-xl font-bold transition">
+                    </div>
+                </div>
+
+                <div class="pt-4 flex items-center gap-2">
+                    <input type="checkbox" id="ai-use-search" class="w-5 h-5 cursor-pointer accent-yellow-400">
+                    <label for="ai-use-search" class="text-sm text-white font-bold cursor-pointer">אפשר חיפוש ברשת (למידע מעודכן וחדשות)</label>
+                </div>
+
+                <div id="ai-error-message" class="hidden text-red-200 font-bold bg-red-900/60 p-3 rounded-lg text-sm text-center border border-red-500 mt-4"></div>
+            </div>
+
+            <button id="ai-generate-btn" onclick="generateQuizWithAI()" class="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xl font-bold py-4 rounded-xl game-btn flex items-center justify-center">
+                <i class="fas fa-bolt ml-2"></i> צור חידון בעזרת AI
+            </button>
+            
+            <div id="ai-loading-indicator" class="hidden text-center py-4">
+                <div class="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-yellow-300 mb-2"></div>
+                <p class="text-yellow-300 font-bold animate-pulse">מייצר שאלות...</p>
+                <div class="w-full bg-black/30 rounded-full h-2 mt-4 overflow-hidden">
+                    <div class="thinking-bar w-full h-full"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- מסך עורך מתקדם -->
+    <div id="view-advanced-editor" class="view hidden fade-in">
+        <div class="glass-card p-6 max-w-4xl w-full mx-4 h-[90vh] flex flex-col relative">
+            <div class="flex justify-between items-center mb-4 border-b border-white/20 pb-4">
+                <div class="flex items-center gap-4">
+                    <button onclick="switchView('view-creator-dashboard')" class="bg-black/30 hover:bg-black/50 px-4 py-2 rounded-xl transition text-sm">
+                        <i class="fas fa-arrow-right ml-1"></i> חזור
+                    </button>
+                    <h2 id="editor-header-title" class="text-2xl font-bold">עורך שאלות מתקדם</h2>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-save-archive" onclick="promptSaveQuiz(this)" class="bg-blue-500 hover:bg-blue-400 text-white px-5 py-2 rounded-xl font-bold game-btn flex items-center">
+                        <i class="fas fa-save ml-2"></i> שמור לארכיון
+                    </button>
+                    <button onclick="saveAndStartCustomQuiz()" class="bg-green-500 hover:bg-green-400 text-white px-5 py-2 rounded-xl font-bold game-btn flex items-center">
+                        <i class="fas fa-play ml-2"></i> הפעל משחק
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-1 overflow-hidden gap-4">
+                <div class="w-1/4 bg-black/20 rounded-xl p-2 overflow-y-auto flex flex-col gap-2" id="editor-questions-list"></div>
+
+                <div class="w-3/4 bg-black/20 rounded-xl p-6 overflow-y-auto relative" id="editor-main-area">
+                    <div class="text-right space-y-6">
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="font-bold text-gray-300">השאלה:</label>
+                                <div class="flex gap-2">
+                                    <label class="cursor-pointer text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded transition flex items-center shadow-md">
+                                        <i class="fas fa-image ml-1"></i> צור שאלה מתמונה (AI)
+                                        <input type="file" accept="image/*" onchange="generateQuestionFromImageAI(this)" class="hidden">
+                                    </label>
+                                    <button id="btn-enhance-q" onclick="enhanceQuestionAI()" class="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded transition flex items-center shadow-md">
+                                        <i class="fas fa-magic ml-1"></i> שפר ניסוח (AI)
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="text" id="edit-q-text" class="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white outline-none focus:border-blue-400 text-lg" placeholder="הקלד את השאלה כאן...">
+                            <div class="flex justify-end gap-2 mt-2">
+                                <button onclick="adjustQuestionDifficulty('easier')" class="text-xs bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded transition">קל יותר (AI)</button>
+                                <button onclick="adjustQuestionDifficulty('harder')" class="text-xs bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded transition">קשה יותר (AI)</button>
+                            </div>
+                        </div>
+
+                        <!-- זמן ותשובות (מקוצר לתצוגה) -->
+                        <div class="flex items-center gap-4">
+                            <label class="font-bold text-gray-300">זמן מענה (בשניות):</label>
+                            <select id="edit-q-time" class="bg-white/10 border border-white/20 rounded-lg p-2 text-white outline-none">
+                                <option value="10" class="text-black">10</option>
+                                <option value="20" class="text-black">20</option>
+                                <option value="30" class="text-black" selected>30</option>
+                                <option value="60" class="text-black">60</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block mb-2 font-bold text-gray-300">תשובות (סמן את התשובה הנכונה):</label>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="flex items-center p-2 rounded-xl color-red bg-opacity-80 border-2 border-transparent focus-within:border-white">
+                                    <input type="radio" name="correct-answer" value="0" id="correct-0" class="w-6 h-6 ml-3 cursor-pointer">
+                                    <input type="text" id="edit-ans-0" class="bg-transparent text-white placeholder-white/60 font-bold outline-none flex-1" placeholder="תשובה 1 (אדום)">
+                                </div>
+                                <div class="flex items-center p-2 rounded-xl color-blue bg-opacity-80 border-2 border-transparent focus-within:border-white">
+                                    <input type="radio" name="correct-answer" value="1" id="correct-1" class="w-6 h-6 ml-3 cursor-pointer">
+                                    <input type="text" id="edit-ans-1" class="bg-transparent text-white placeholder-white/60 font-bold outline-none flex-1" placeholder="תשובה 2 (כחול)">
+                                </div>
+                                <div class="flex items-center p-2 rounded-xl color-yellow bg-opacity-80 border-2 border-transparent focus-within:border-white">
+                                    <input type="radio" name="correct-answer" value="2" id="correct-2" class="w-6 h-6 ml-3 cursor-pointer">
+                                    <input type="text" id="edit-ans-2" class="bg-transparent text-white placeholder-white/60 font-bold outline-none flex-1" placeholder="תשובה 3 (צהוב)">
+                                </div>
+                                <div class="flex items-center p-2 rounded-xl color-green bg-opacity-80 border-2 border-transparent focus-within:border-white">
+                                    <input type="radio" name="correct-answer" value="3" id="correct-3" class="w-6 h-6 ml-3 cursor-pointer">
+                                    <input type="text" id="edit-ans-3" class="bg-transparent text-white placeholder-white/60 font-bold outline-none flex-1" placeholder="תשובה 4 (ירוק)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 flex gap-4">
+                            <button onclick="saveCurrentQuestionToDraft()" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold flex-1 game-btn">
+                                <i class="fas fa-save ml-2"></i> שמור שינויים לשאלה
+                            </button>
+                            <button onclick="addNewQuestionToDraft()" class="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl font-bold game-btn">
+                                <i class="fas fa-plus ml-2"></i> הוסף חדשה
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- מסך חידונים שמורים -->
+    <div id="view-saved-quizzes" class="view hidden fade-in">
+        <div class="glass-card p-8 max-w-4xl w-full mx-4 relative h-[80vh] flex flex-col">
+            <button onclick="switchView('view-creator-dashboard')" class="absolute top-4 right-4 text-white/70 hover:text-white transition">
+                <i class="fas fa-arrow-right"></i> חזור
+            </button>
+            <div class="text-center mb-8 mt-4">
+                <i class="fas fa-archive text-4xl text-purple-400 mb-2"></i>
+                <h2 class="text-3xl font-bold">החידונים השמורים שלי</h2>
+            </div>
+            <div id="saved-quizzes-list" class="flex-1 overflow-y-auto space-y-4 pr-2 bg-black/20 p-4 rounded-xl border border-white/10"></div>
+        </div>
+    </div>
+
+    <!-- מסך מארח: לובי -->
+    <div id="view-host" class="view stage-bg fade-in">
+        <div id="game-pin-tag" class="fixed top-4 left-4 bg-white/90 text-black px-4 py-2 rounded-full font-bold shadow-lg z-50 text-xl hidden">
+            קוד חדר: ----
+        </div>
+
+        <div class="text-center z-10 p-8 w-full max-w-5xl">
+            <h2 class="text-4xl font-bold mb-4 drop-shadow-md">הצטרפו למשחק!</h2>
+            
+            <div class="glass-card p-10 mb-8 max-w-2xl mx-auto flex flex-col items-center">
+                <div class="text-2xl text-white/80 mb-2">סרקו את הקוד או כנסו לקישור:</div>
+                <div class="text-7xl font-black tracking-widest text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] mb-8" id="host-pin-display">
+                    טוען חדר...
+                </div>
+
+                <div class="flex gap-8 items-center justify-center w-full">
+                    <div id="qrcode-container" class="bg-white p-2 rounded-xl hidden md:block">
+                        <img id="qr-img" src="" alt="QR Code" width="150" height="150">
+                    </div>
+                    <div class="flex flex-col gap-4">
+                        <div class="text-lg font-bold">שיתוף מהיר:</div>
+                        <button onclick="shareViaWhatsApp()" class="bg-green-500 hover:bg-green-400 text-white font-bold py-3 px-6 rounded-full game-btn flex items-center">
+                            <i class="fab fa-whatsapp text-2xl ml-2"></i> שלח בוואטסאפ
+                        </button>
+                        <button onclick="copyInviteLink(event)" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-6 rounded-full game-btn text-sm flex items-center">
+                            <i class="fas fa-copy ml-2"></i> העתק קישור
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mb-4 px-4 bg-black/40 py-3 rounded-2xl">
+                <div class="text-xl font-bold"><i class="fas fa-users mr-2"></i> מחוברים: <span id="player-count">0</span></div>
+                <button onclick="startHostGame()" id="start-game-btn" class="bg-gray-500 text-white font-bold py-3 px-10 rounded-xl game-btn transition" disabled>
+                    ממתין לשחקנים...
+                </button>
+            </div>
+
+            <div id="players-list" class="flex flex-wrap gap-3 justify-center min-h-[100px] p-4 glass-card">
+                <div class="text-white/50 italic text-lg m-auto" id="waiting-msg">ממתין לשחקנים...</div>
+            </div>
+            <button onclick="addBot()" class="mt-8 text-sm text-white/50 hover:text-white underline">(הוסף בוט להדגמה)</button>
+        </div>
+    </div>
+
+    <!-- מסך מארח: הצגת שאלה -->
+    <div id="view-host-question" class="view stage-bg fade-in">
+        <div class="fixed bottom-4 left-4 bg-black/60 backdrop-blur-md p-3 rounded-2xl flex gap-3 z-50 border border-white/20">
+            <button onclick="previousQuestion()" class="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition" title="שאלה קודמת"><i class="fas fa-step-forward"></i></button>
+            <button id="btn-pause-play" onclick="togglePauseGame()" class="w-12 h-12 bg-yellow-500/80 hover:bg-yellow-400 rounded-full flex items-center justify-center transition shadow-lg"><i class="fas fa-pause text-xl"></i></button>
+            <button onclick="skipQuestion()" class="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition" title="דלג שאלה"><i class="fas fa-step-backward"></i></button>
+            <button id="btn-ai-hint" onclick="getAIHint()" class="w-12 h-12 bg-purple-600 hover:bg-purple-500 text-yellow-300 rounded-full flex items-center justify-center transition shadow-lg" title="קבל רמז מה-AI"><i class="fas fa-lightbulb text-xl"></i></button>
+        </div>
+
+        <div class="w-full max-w-6xl p-6 text-center z-10 flex flex-col h-screen justify-between">
+            <div class="flex justify-between items-center bg-black/40 p-4 rounded-2xl mb-4">
+                <div class="text-2xl font-bold bg-white/20 px-4 py-2 rounded-full" id="host-q-counter">שאלה 1 מתוך 5</div>
+                <div class="text-5xl font-black text-white bg-black/50 w-24 h-24 rounded-full flex items-center justify-center border-4 border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]" id="host-timer">20</div>
+                <button onclick="toggleAudio()" id="audio-toggle" class="text-white/70 hover:text-white transition"><i class="fas fa-volume-up text-2xl"></i></button>
+            </div>
+
+            <div class="glass-card p-10 mb-4 flex-1 flex flex-col justify-center items-center relative">
+                <h2 class="text-5xl font-bold drop-shadow-lg leading-tight" id="host-question-text">טוען שאלה...</h2>
+                <div id="host-question-media" class="mt-6 max-h-[30vh] overflow-hidden rounded-xl border-4 border-white/20 hidden"></div>
+                
+                <div id="host-hint-container" class="hidden absolute bottom-4 bg-purple-900/80 border border-purple-400 p-4 rounded-xl text-xl text-yellow-300 shadow-lg animate-bounce">
+                    <i class="fas fa-magic mr-2"></i> <span id="host-hint-text"></span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 h-48" id="host-answers-grid"></div>
+        </div>
+    </div>
+
+    <!-- מסך מארח: תוצאות שאלה -->
+    <div id="view-host-results" class="view stage-bg fade-in">
+        <div class="w-full max-w-4xl p-8 text-center z-10">
+            <h2 class="text-5xl font-bold mb-8">הזמן עבר!</h2>
+            <div class="glass-card p-8 mb-8">
+                <div id="correct-answer-display" class="text-3xl font-bold p-6 rounded-2xl mb-6 shadow-lg border-2 border-white/30"></div>
+                
+                <div class="flex flex-wrap justify-center gap-4 mb-6">
+                    <button id="btn-explain-answer" onclick="explainAnswerAI()" class="bg-teal-600/50 hover:bg-teal-500 text-white px-4 py-2 rounded-lg font-bold text-sm transition border border-teal-400">
+                        <i class="fas fa-chalkboard-teacher text-yellow-400 ml-1"></i> הסבר את התשובה (AI)
+                    </button>
+                </div>
+                <div id="ai-fun-fact-container" class="hidden bg-indigo-900/50 border border-indigo-400 p-4 rounded-xl mb-6 text-lg text-white/90 shadow-inner">
+                    <span id="ai-fun-fact-text"></span>
+                </div>
+                
+                <h3 class="text-2xl mb-4">מצב נקודות (מובילים):</h3>
+                <div id="leaderboard-preview" class="space-y-3 max-w-lg mx-auto bg-black/30 p-6 rounded-xl"></div>
+            </div>
+            
+            <button onclick="nextQuestion()" class="bg-blue-600 hover:bg-blue-500 text-white text-2xl font-bold py-4 px-12 rounded-full game-btn shadow-[0_0_20px_rgba(59,130,246,0.5)]">
+                הבא <i class="fas fa-arrow-left ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- מסך מארח: פודיום -->
+    <div id="view-host-podium" class="view stage-bg fade-in">
+        <div class="text-center z-10 w-full">
+            <h2 class="text-6xl font-black mb-12 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-white to-yellow-300 drop-shadow-lg uppercase tracking-widest">
+                המנצחים הגדולים!
+            </h2>
+            <div class="flex items-end justify-center h-80 gap-4 mt-20" id="podium-container"></div>
+            
+            <div class="mt-12 flex flex-col items-center justify-center gap-4">
+                <button id="btn-podium-speech" onclick="generatePodiumSpeechAI()" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold py-3 px-8 rounded-full transition shadow-lg flex items-center border border-white/30">
+                    <i class="fas fa-bullhorn ml-2"></i> הכרזת המנצחים בקול (AI)
+                </button>
+                <div id="podium-speech-loading" class="hidden text-yellow-300 font-bold animate-pulse text-sm">
+                    <i class="fas fa-spinner fa-spin ml-1"></i> מכין את נאום הניצחון...
+                </div>
+                <audio id="podium-audio-player" class="hidden"></audio>
+            </div>
+
+            <button onclick="endGameAndReturn()" class="mt-16 bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-8 rounded-full transition">
+                סיים וחזור לראשי
+            </button>
+        </div>
+    </div>
+
+    <!-- מסך שחקן: המתנה (בטלפון) -->
+    <div id="view-player-waiting" class="view bg-slate-900 fade-in">
+        <div class="text-center p-8">
+            <div class="text-2xl font-bold text-white mb-2" id="player-greeting">שלום!</div>
+            <h2 class="text-4xl font-black text-yellow-400 mb-8" id="player-wait-title">אתה בפנים!</h2>
+            <p class="text-white/70 text-lg mb-8" id="player-wait-subtitle">הסתכל על המסך הראשי.<br>החידון עומד להתחיל...</p>
+            <div class="animate-pulse">
+                <i class="fas fa-spinner fa-spin text-4xl text-white/30"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- מסך שחקן: כפתורי תשובה -->
+    <div id="view-player-game" class="view bg-slate-100 fade-in relative">
+        <div class="absolute top-0 w-full h-2 bg-gray-300">
+            <div id="player-progress-bar" class="h-full bg-blue-500 w-full" style="transition: width 1s linear;"></div>
+        </div>
+        <div class="w-full h-screen grid grid-cols-2 grid-rows-2 p-2 gap-2" id="player-buttons-container">
+            <button onclick="submitAnswer(0)" class="color-red rounded-xl game-btn flex items-center justify-center"><i class="fas fa-triangle text-white text-5xl opacity-80" style="clip-path: polygon(50% 0%, 0% 100%, 100% 100%);"></i></button>
+            <button onclick="submitAnswer(1)" class="color-blue rounded-xl game-btn flex items-center justify-center"><i class="fas fa-square text-white text-5xl opacity-80"></i></button>
+            <button onclick="submitAnswer(2)" class="color-yellow rounded-xl game-btn flex items-center justify-center"><i class="fas fa-circle text-white text-5xl opacity-80"></i></button>
+            <button onclick="submitAnswer(3)" class="color-green rounded-xl game-btn flex items-center justify-center"><i class="fas fa-square text-white text-5xl opacity-80" style="transform: rotate(45deg);"></i></button>
+        </div>
+    </div>
+
+    <!-- מסך שחקן: תוצאה -->
+    <div id="view-player-result" class="view fade-in">
+        <div class="text-center p-10 w-full h-screen flex flex-col justify-center items-center" id="player-result-bg">
+            <div id="player-result-icon" class="text-7xl text-white mb-6 drop-shadow-md"></div>
+            <h2 class="text-5xl font-bold text-white mb-4 drop-shadow-md" id="player-result-title"></h2>
+            <div class="bg-black/30 backdrop-blur-sm p-4 rounded-2xl inline-block mt-4">
+                <p class="text-white/80 text-xl mb-1">ניקוד שנצבר</p>
+                <div class="text-3xl font-black text-white" id="player-score-added">+0</div>
+            </div>
+            <div class="mt-8 text-white/90 font-bold text-xl">
+                ניקוד כולל: <span id="player-total-score">0</span>
+            </div>
+            <div class="mt-4 text-yellow-300 font-bold text-2xl" id="player-rank-display"></div>
+            <div class="mt-12 text-white/60 animate-pulse">המתן לשאלה הבאה...</div>
+        </div>
+    </div>
+
+    <!-- חלונות קופצים פנימיים (Modals) -->
+    <div id="custom-message-box" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center fade-in">
+        <div class="glass-card p-8 max-w-sm w-full mx-4 text-center border border-white/20">
+            <h3 id="custom-message-text" class="text-xl font-bold mb-6 text-white"></h3>
+            <button onclick="closeMessageBox()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl game-btn">הבנתי</button>
+        </div>
+    </div>
+
+    <div id="custom-prompt-box" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[200] flex items-center justify-center fade-in">
+        <div class="glass-card p-8 max-w-sm w-full mx-4 text-center border border-white/20">
+            <h3 id="custom-prompt-text" class="text-xl font-bold mb-4 text-white"></h3>
+            <input type="text" id="custom-prompt-input" class="w-full bg-black/40 border-2 border-white/20 rounded-xl p-3 text-white text-lg font-bold text-center outline-none focus:border-yellow-400 mb-6">
+            <div class="flex gap-4">
+                <button onclick="closePromptBox(false)" class="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition">ביטול</button>
+                <button onclick="closePromptBox(true)" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl game-btn">אישור</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editor-options" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center fade-in">
+        <div class="glass-card p-8 max-w-md w-full mx-4 text-center border border-white/20">
+            <h3 class="text-3xl font-bold mb-6 text-yellow-300">מה תרצה לעשות?</h3>
+            <div class="flex flex-col gap-4">
+                <button onclick="showNewQuizNameModal()" class="w-full bg-blue-600 hover:bg-blue-500 text-white text-xl font-bold py-4 rounded-xl game-btn flex items-center justify-center">
+                    <i class="fas fa-plus-circle ml-2"></i> צור חידון חדש
+                </button>
+                <button onclick="hideEditorOptionsAndShowSaved()" class="w-full bg-purple-600 hover:bg-purple-500 text-white text-xl font-bold py-4 rounded-xl game-btn flex items-center justify-center">
+                    <i class="fas fa-folder-open ml-2"></i> פתח חידונים שמורים
+                </button>
+                <button onclick="closeModal('modal-editor-options')" class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition mt-2">ביטול</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-new-quiz-name" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center fade-in">
+        <div class="glass-card p-8 max-w-md w-full mx-4 text-center border border-white/20">
+            <h3 class="text-2xl font-bold mb-2">איך תרצה לקרוא לחידון?</h3>
+            <p class="text-white/60 text-sm mb-6">למשל: חידון שבת, חידון היסטוריה...</p>
+            <input type="text" id="new-quiz-name-input" class="w-full bg-black/40 border-2 border-white/20 rounded-xl p-4 text-white text-xl font-bold text-center outline-none focus:border-yellow-400 mb-6" placeholder="הקלד שם כאן...">
+            <div class="flex gap-4">
+                <button onclick="closeModal('modal-new-quiz-name')" class="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition">ביטול</button>
+                <button onclick="confirmNewQuizName()" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl game-btn">המשך לעורך</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === הגדרות משתנים גלובליים ומולטיפלייר (PeerJS) ===
+        let gamePin = "";
+        let players = []; 
+        let myPlayerId = null;
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let timerInterval = null;
+        let timeLeft = 0;
+        let isAudioEnabled = true;
+        let isPaused = false;
+        
+        let draftQuestions = [];
+        let editingIndex = -1;
+        let currentEditingQuizId = null;
+        let currentQuizName = "החידון שלי";
+
+        window.localQuizzesMap = {}; 
+        let synth;
+
+        // PeerJS מולטיפלייר
+        let peer = null;
+        let hostConnection = null; // ללקוח: חיבור לשרת/מארח
+        let clientConnections = {}; // למארח: מילון של כל החיבורים (playerId -> connection)
+        let isHostMode = false;
+
+        // פונקציות חלונות קופצים (Modals)
+        function showMessage(text) {
+            const box = document.getElementById('custom-message-box');
+            const msg = document.getElementById('custom-message-text');
+            if(box && msg) { msg.innerText = text; box.classList.remove('hidden'); }
+        }
+        function closeMessageBox() {
+            const box = document.getElementById('custom-message-box');
+            if(box) box.classList.add('hidden');
+        }
+        let promptCallback = null;
+        function showCustomPrompt(text, defaultText, callback) {
+            const box = document.getElementById('custom-prompt-box');
+            const msg = document.getElementById('custom-prompt-text');
+            const input = document.getElementById('custom-prompt-input');
+            if(box && msg && input) {
+                msg.innerText = text; input.value = defaultText || '';
+                promptCallback = callback; box.classList.remove('hidden');
+                setTimeout(() => input.focus(), 100);
+            }
+        }
+        function closePromptBox(isOk) {
+            const box = document.getElementById('custom-prompt-box');
+            const input = document.getElementById('custom-prompt-input');
+            if(box) box.classList.add('hidden');
+            if(promptCallback && isOk) promptCallback(input.value);
+        }
+
+        // טעינה ראשונית
+        window.onload = function() {
+            initAudio();
+            setTimeout(checkDeepLink, 500); // מאפשר ל-DOM להיטען לפני בדיקת הקישור
+            
+            try {
+                if (!localStorage.getItem('adminPassword')) localStorage.setItem('adminPassword', '3020');
+                const saved = localStorage.getItem('asrinu_saved_quizzes');
+                if (saved) window.localQuizzesMap = JSON.parse(saved);
+            } catch(e) {}
+        };
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+            const target = document.getElementById(viewId);
+            if (target) {
+                target.classList.remove('hidden');
+                const pinTag = document.getElementById('game-pin-tag');
+                if (viewId === 'view-host-question' || viewId === 'view-host-results') {
+                    if (pinTag) pinTag.classList.remove('hidden');
+                } else {
+                    if (pinTag) pinTag.classList.add('hidden');
+                }
+            }
+        }
+
+        function initAudio() {
+            try {
+                synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                synth.volume.value = -10;
+            } catch (e) { console.log("Audio init failed"); }
+        }
+
+        function playSound(type) {
+            if (!isAudioEnabled || !synth) return;
+            Tone.start();
+            const now = Tone.now();
+            if (type === 'correct') synth.triggerAttackRelease(["C5", "E5", "G5"], "8n", now);
+            else if (type === 'wrong') synth.triggerAttackRelease(["C3", "G2"], "4n", now);
+            else if (type === 'tick') synth.triggerAttackRelease("C6", "32n", now, 0.1);
+        }
+
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            const icon = document.querySelector('#audio-toggle i');
+            if(icon) icon.className = isAudioEnabled ? 'fas fa-volume-up text-2xl' : 'fas fa-volume-mute text-2xl text-red-400';
+        }
+
+        // ניהול עורך שאלות
+        function showEditorOptions() { document.getElementById('modal-editor-options').classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function hideEditorOptionsAndShowSaved() { closeModal('modal-editor-options'); showSavedQuizzes(); }
+        function showNewQuizNameModal() {
+            closeModal('modal-editor-options');
+            const input = document.getElementById('new-quiz-name-input');
+            if (input) { input.value = ''; input.classList.remove('border-red-500'); }
+            document.getElementById('modal-new-quiz-name').classList.remove('hidden');
+            setTimeout(() => { if(input) input.focus(); }, 100);
+        }
+
+        function confirmNewQuizName() {
+            const input = document.getElementById('new-quiz-name-input');
+            const name = input ? input.value.trim() : "";
+            if (!name) { if (input) input.classList.add('border-red-500'); return; }
+            
+            currentQuizName = name;
+            closeModal('modal-new-quiz-name');
+            currentEditingQuizId = null;
+            draftQuestions = [];
+            addNewQuestionToDraft();
+            
+            const headerTitle = document.getElementById('editor-header-title');
+            if (headerTitle) headerTitle.innerText = "עורך שאלות: " + currentQuizName;
+            switchView('view-advanced-editor');
+        }
+
+        // ניהול שמירה
+        function promptSaveQuiz(btn) {
+            saveCurrentQuestionToDraft();
+            if (draftQuestions.length === 0) { showMessage("אין שאלות בחידון."); return; }
+            
+            const quizName = currentQuizName || "החידון שלי";
+            const quizId = currentEditingQuizId || 'quiz_' + Date.now().toString();
+            const quizData = { name: quizName.trim(), questions: JSON.parse(JSON.stringify(draftQuestions)), timestamp: Date.now() };
+
+            if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin ml-2"></i> שומר...';
+
+            window.localQuizzesMap[quizId] = quizData;
+            try { localStorage.setItem('asrinu_saved_quizzes', JSON.stringify(window.localQuizzesMap)); } catch(e) {}
+            
+            currentEditingQuizId = quizId;
+            
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-check ml-2"></i> נשמר בארכיון!';
+                btn.classList.replace('bg-blue-500', 'bg-green-500');
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-save ml-2"></i> שמור לארכיון';
+                    btn.classList.replace('bg-green-500', 'bg-blue-500');
+                }, 2000);
+            }
+            setTimeout(() => { showSavedQuizzes(); }, 600);
+        }
+
+        function showSavedQuizzes() {
+            const list = document.getElementById('saved-quizzes-list');
+            if(!list) return;
+            switchView('view-saved-quizzes');
+            list.innerHTML = '';
+            
+            const saved = Object.values(window.localQuizzesMap);
+            if (saved.length === 0) {
+                list.innerHTML = '<div class="text-center text-white/60 mt-10 text-xl font-bold">לא נמצאו חידונים שמורים.</div>';
+                return;
+            }
+            
+            saved.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            saved.forEach(quiz => {
+                const qId = Object.keys(window.localQuizzesMap).find(k => window.localQuizzesMap[k] === quiz);
+                const div = document.createElement('div');
+                div.className = 'bg-black/40 p-5 rounded-xl flex justify-between items-center border border-white/20 hover:border-yellow-400/50 transition';
+                div.innerHTML = `
+                    <div class="text-right">
+                        <h3 class="text-2xl font-bold text-yellow-300 mb-1">${quiz.name}</h3>
+                        <p class="text-sm text-white/70 bg-white/10 inline-block px-3 py-1 rounded-full">${quiz.questions.length} שאלות</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="editSavedQuiz('${qId}')" class="bg-blue-600 hover:bg-blue-500 text-white w-12 h-12 rounded-xl transition flex items-center justify-center"><i class="fas fa-edit text-xl"></i></button>
+                        <button onclick="playSavedQuiz('${qId}')" class="bg-green-600 hover:bg-green-500 text-white w-12 h-12 rounded-xl transition flex items-center justify-center"><i class="fas fa-play text-xl"></i></button>
+                        <button onclick="deleteSavedQuiz('${qId}')" class="bg-red-600 hover:bg-red-500 text-white w-12 h-12 rounded-xl transition flex items-center justify-center"><i class="fas fa-trash text-xl"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function editSavedQuiz(id) {
+            const quiz = window.localQuizzesMap[id];
+            if (quiz) {
+                draftQuestions = JSON.parse(JSON.stringify(quiz.questions));
+                currentEditingQuizId = id;
+                currentQuizName = quiz.name;
+                document.getElementById('editor-header-title').innerText = "עורך: " + currentQuizName;
+                renderEditorList();
+                if(draftQuestions.length > 0) loadQuestionToEditor(0);
+                else addNewQuestionToDraft();
+                switchView('view-advanced-editor');
+            }
+        }
+
+        function playSavedQuiz(id) {
+            const quiz = window.localQuizzesMap[id];
+            if (quiz && quiz.questions.length > 0) {
+                startHostWithQuestions(JSON.parse(JSON.stringify(quiz.questions)));
+            }
+        }
+
+        function deleteSavedQuiz(id) {
+            showCustomPrompt("האם אתה בטוח למחוק? (הקלד כן כדי לאשר)", "", (res) => {
+                if(res === 'כן' || res === 'yes') {
+                    delete window.localQuizzesMap[id];
+                    try { localStorage.setItem('asrinu_saved_quizzes', JSON.stringify(window.localQuizzesMap)); } catch(e) {}
+                    showSavedQuizzes();
+                }
+            });
+        }
+
+        // פונקציות עזר לעורך...
+        function renderEditorList() {
+            const list = document.getElementById('editor-questions-list');
+            if (!list) return;
+            list.innerHTML = '';
+            draftQuestions.forEach((q, idx) => {
+                const div = document.createElement('div');
+                div.className = `p-3 rounded-lg cursor-pointer transition flex justify-between items-center ${idx === editingIndex ? 'bg-blue-600 border border-blue-400' : 'bg-black/40'}`;
+                div.innerHTML = `<div class="truncate flex-1 font-bold ml-2 text-sm" onclick="loadQuestionToEditor(${idx})">${idx + 1}. ${q.question || 'שאלה חדשה...'}</div>`;
+                list.appendChild(div);
+            });
+        }
+
+        function loadQuestionToEditor(index) {
+            editingIndex = index;
+            const q = draftQuestions[index];
+            document.getElementById('edit-q-text').value = q.question || '';
+            document.getElementById('edit-q-time').value = q.time || 30;
+            for(let i=0; i<4; i++) {
+                document.getElementById(`edit-ans-${i}`).value = q.answers[i] || '';
+                document.getElementById(`correct-${i}`).checked = (q.correctAnswer === i);
+            }
+            renderEditorList();
+        }
+
+        function saveCurrentQuestionToDraft() {
+            if (editingIndex < 0 || editingIndex >= draftQuestions.length) return;
+            let ans = []; let corr = 0;
+            for(let i=0; i<4; i++) {
+                ans.push(document.getElementById(`edit-ans-${i}`).value || '...');
+                if(document.getElementById(`correct-${i}`).checked) corr = i;
+            }
+            draftQuestions[editingIndex] = {
+                question: document.getElementById('edit-q-text').value || 'שאלה ללא שם',
+                answers: ans,
+                correctAnswer: corr,
+                time: parseInt(document.getElementById('edit-q-time').value) || 30
+            };
+            renderEditorList();
+        }
+
+        function addNewQuestionToDraft() {
+            draftQuestions.push({ question: '', answers: ['', '', '', ''], correctAnswer: 0, time: 30 });
+            loadQuestionToEditor(draftQuestions.length - 1);
+        }
+
+        function saveAndStartCustomQuiz() {
+            saveCurrentQuestionToDraft();
+            const valid = draftQuestions.filter(q => q.question.trim() !== '' && q.question !== 'שאלה ללא שם');
+            if (valid.length > 0) startHostWithQuestions(valid);
+            else showMessage("אין שאלות תקינות בחידון.");
+        }
+
+
+        // === מנגנון המארח והמולטיפלייר (PeerJS Host) ===
+        
+        function startHostWithDemo() {
+            startHostWithQuestions([
+                { question: "מהי בירת צרפת?", answers: ["לונדון", "פריז", "רומא", "מדריד"], correctAnswer: 1, time: 20 },
+                { question: "כמה רגליים יש לעכביש?", answers: ["6", "8", "10", "4"], correctAnswer: 1, time: 15 }
+            ]);
+        }
+
+        function startHostWithQuestions(qs) {
+            questions = qs;
+            currentQuestionIndex = 0;
+            players = [];
+            clientConnections = {};
+            isHostMode = true;
+            
+            gamePin = Math.floor(100000 + Math.random() * 900000).toString();
+            
+            const startBtn = document.getElementById('start-game-btn');
+            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> פותח חדר...';
+            startBtn.disabled = true;
+
+            switchView('view-host');
+
+            // יצירת "שרת" מקומי באמצעות PeerJS
+            peer = new Peer('asrinu-game-' + gamePin, {
+                debug: 2
+            });
+            
+            peer.on('open', function(id) {
+                document.getElementById('host-pin-display').innerText = gamePin;
+                document.getElementById('game-pin-tag').innerText = "קוד חדר: " + gamePin;
+                
+                startBtn.innerHTML = 'ממתין לשחקנים...';
+                
+                updatePlayersList();
+                setupInviteLinks();
+            });
+
+            peer.on('connection', function(conn) {
+                conn.on('data', function(data) {
+                    handleMessageFromPlayer(conn, data);
+                });
+                conn.on('close', function() {
+                    // טיפול בשחקן שהתנתק (אופציונלי)
+                });
+            });
+
+            peer.on('error', function(err) {
+                 showMessage("שגיאה ביצירת חדר משחק. נסה שוב.");
+                 console.error(err);
+                 endGameAndReturn();
+            });
+        }
+
+        function broadcastToPlayers(data) {
+            Object.values(clientConnections).forEach(conn => {
+                if(conn && conn.open) {
+                    conn.send(data);
+                }
+            });
+        }
+
+        function handleMessageFromPlayer(conn, data) {
+            if (data.type === 'join') {
+                clientConnections[data.id] = conn;
+                players.push({
+                    id: data.id,
+                    name: data.name,
+                    score: 0,
+                    isBot: false,
+                    hasAnswered: false,
+                    lastAnswerCorrect: null,
+                    lastScoreAdded: 0
+                });
+                updatePlayersList();
+                conn.send({ type: 'join_success', name: data.name });
+            } 
+            else if (data.type === 'answer') {
+                const p = players.find(x => x.id === data.id);
+                if (p && !p.hasAnswered) {
+                    p.hasAnswered = true;
+                    const q = questions[currentQuestionIndex];
+                    if (data.answerIndex === q.correctAnswer) {
+                        const scoreAdd = Math.floor(500 + (timeLeft / (q.time || 30)) * 500);
+                        p.score += scoreAdd;
+                        p.lastAnswerCorrect = true;
+                        p.lastScoreAdded = scoreAdd;
+                    } else {
+                        p.lastAnswerCorrect = false;
+                        p.lastScoreAdded = 0;
+                    }
+                    conn.send({ type: 'answer_received' });
+                    
+                    // בדיקה אם כולם ענו
+                    const allAnswered = players.length > 0 && players.every(p => p.hasAnswered);
+                    if (allAnswered && timeLeft > 0) {
+                        clearInterval(timerInterval);
+                        showHostResults();
+                    }
+                }
+            }
+        }
+
+        function updatePlayersList() {
+            const list = document.getElementById('players-list');
+            document.getElementById('player-count').innerText = players.length;
+            const startBtn = document.getElementById('start-game-btn');
+            
+            if (players.length > 0) {
+                list.innerHTML = '';
+                players.forEach(p => {
+                    const el = document.createElement('div');
+                    el.className = 'bg-white/20 px-4 py-2 rounded-full font-bold animate-bounce text-lg';
+                    el.innerText = p.name;
+                    list.appendChild(el);
+                });
+                startBtn.innerText = 'התחל משחק!';
+                startBtn.classList.replace('bg-gray-500', 'bg-blue-600');
+                startBtn.disabled = false;
+            }
+        }
+
+        // === מנגנון השחקן והצטרפות דרך הקישור ===
+        
+        function setupInviteLinks() {
+            let base = window.location.href.split('?')[0];
+            if (base.includes('blob:') || base === 'null') base = window.location.origin + window.location.pathname;
+            if (base.endsWith('/')) base = base.slice(0, -1);
+            
+            const inviteLink = `${base}?pin=${gamePin}`;
+            window.currentInviteLink = inviteLink;
+            
+            document.getElementById('qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(inviteLink)}`;
+        }
+
+        function checkDeepLink() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const pin = urlParams.get('pin');
+            if (pin) {
+                document.getElementById('pin-input').value = pin;
+                checkPin(true); // מפעיל בדיקה חיה מול השרת שנוצר!
+            }
+        }
+
+        function checkPin(isDeepLink = false) {
+            const inputVal = document.getElementById('pin-input').value.trim();
+            const error = document.getElementById('pin-error');
+            if (!inputVal) return;
+
+            const btn = document.querySelector('#join-step-1 button');
+            const origText = btn.innerText;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מתחבר לחדר...';
+            btn.disabled = true;
+
+            // נסיון להתחבר לחדר (המארח) דרך PeerJS
+            peer = new Peer({ debug: 2 });
+            
+            peer.on('open', function(id) {
+                hostConnection = peer.connect('asrinu-game-' + inputVal, { reliable: true });
+                
+                hostConnection.on('open', function() {
+                    // החיבור הצליח! החדר קיים.
+                    gamePin = inputVal;
+                    if(error) error.classList.add('hidden');
+                    
+                    document.getElementById('join-step-1').classList.add('hidden');
+                    document.getElementById('join-step-2').classList.remove('hidden');
+                    document.getElementById('display-joined-pin').innerText = "קוד: " + gamePin;
+                    
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                    
+                    // מאזין להודעות מהמארח
+                    hostConnection.on('data', handleMessageFromHost);
+                });
+            });
+
+            peer.on('error', function(err) {
+                // אם החדר לא קיים או שיש שגיאה
+                if(error) {
+                    error.innerText = (err.type === 'peer-unavailable') ? "קוד שגוי או שהמשחק הסתיים!" : "שגיאת רשת. נסה שוב.";
+                    error.classList.remove('hidden');
+                }
+                btn.innerHTML = origText;
+                btn.disabled = false;
+                if(isDeepLink) window.history.replaceState({}, document.title, window.location.pathname);
+            });
+        }
+
+        function joinGame() {
+            const name = document.getElementById('nickname-input').value.trim();
+            if (!name) return;
+
+            myPlayerId = 'player_' + Date.now();
+            isHostMode = false;
+            
+            // שליחת בקשת הצטרפות למארח
+            hostConnection.send({ type: 'join', id: myPlayerId, name: name });
+
+            document.getElementById('player-greeting').innerText = `מתחבר...`;
+            switchView('view-player-waiting');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        function submitAnswer(ansIndex) {
+            if (hostConnection && hostConnection.open) {
+                hostConnection.send({ type: 'answer', id: myPlayerId, answerIndex: ansIndex });
+            }
+        }
+
+        function handleMessageFromHost(data) {
+            if (data.type === 'join_success') {
+                document.getElementById('player-greeting').innerText = `שלום, ${data.name}!`;
+                document.getElementById('player-wait-title').innerText = "אתה בפנים!";
+                document.getElementById('player-wait-subtitle').innerHTML = "הסתכל על המסך הראשי.<br>החידון עומד להתחיל...";
+            }
+            else if (data.type === 'question') {
+                switchView('view-player-game');
+                const bar = document.getElementById('player-progress-bar');
+                if(bar) {
+                    bar.style.transition = 'none';
+                    bar.style.width = '100%';
+                    setTimeout(() => {
+                        bar.style.transition = `width ${data.time}s linear`;
+                        bar.style.width = '0%';
+                    }, 50);
+                }
+            } 
+            else if (data.type === 'answer_received') {
+                document.getElementById('player-wait-title').innerText = "תשובה נקלטה!";
+                document.getElementById('player-wait-subtitle').innerText = "ממתין לשאר השחקנים...";
+                switchView('view-player-waiting');
+            }
+            else if (data.type === 'result') {
+                showPlayerResult(data.isCorrect, data.scoreAdded, data.totalScore, data.rank);
+            }
+            else if (data.type === 'podium') {
+                document.getElementById('player-wait-title').innerText = "המשחק הסתיים!";
+                document.getElementById('player-wait-subtitle').innerText = "תודה ששיחקתם! צפו בפודיום במסך הראשי.";
+                switchView('view-player-waiting');
+            }
+        }
+
+        function showPlayerResult(isCorrect, scoreAdded, totalScore, rank) {
+            const bg = document.getElementById('player-result-bg');
+            const icon = document.getElementById('player-result-icon');
+            const title = document.getElementById('player-result-title');
+            
+            if (isCorrect) {
+                bg.className = 'text-center p-10 w-full h-screen flex flex-col justify-center items-center bg-green-600';
+                icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                title.innerText = "תשובה נכונה!";
+                playSound('correct');
+            } else {
+                bg.className = 'text-center p-10 w-full h-screen flex flex-col justify-center items-center bg-red-600';
+                icon.innerHTML = '<i class="fas fa-times-circle"></i>';
+                title.innerText = "טעות!";
+                playSound('wrong');
+            }
+            
+            document.getElementById('player-score-added').innerText = '+' + scoreAdded;
+            document.getElementById('player-total-score').innerText = totalScore;
+            document.getElementById('player-rank-display').innerText = rank ? `אתה במקום ה-${rank}!` : '';
+            
+            switchView('view-player-result');
+        }
+
+        // === לוגיקת ניהול המשחק (המארח) ===
+        
+        function startHostGame() {
+            if(Tone.context.state !== 'running') { Tone.context.resume(); }
+            currentQuestionIndex = -1;
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex >= questions.length) { showPodium(); return; }
+            
+            const q = questions[currentQuestionIndex];
+            document.getElementById('host-q-counter').innerText = `שאלה ${currentQuestionIndex + 1} מתוך ${questions.length}`;
+            document.getElementById('host-question-text').innerText = q.question;
+            
+            const grid = document.getElementById('host-answers-grid');
+            grid.innerHTML = '';
+            const colors = ['bg-red-600', 'bg-blue-600', 'bg-yellow-500', 'bg-green-600'];
+            const icons = ['<i class="fas fa-triangle mr-3"></i>','<i class="fas fa-square mr-3"></i>','<i class="fas fa-circle mr-3"></i>','<i class="fas fa-square mr-3 rotate-45"></i>'];
+            
+            q.answers.forEach((ans, i) => {
+                grid.innerHTML += `<div class="${colors[i]} rounded-xl p-4 flex items-center shadow-lg border-b-4 border-black/30 text-white">${icons[i]} <span class="text-2xl font-bold flex-1 text-right">${ans}</span></div>`;
+            });
+            
+            players.forEach(p => p.hasAnswered = false);
+            timeLeft = q.time || 30;
+            document.getElementById('host-timer').innerText = timeLeft;
+            
+            // עדכון השחקנים המרוחקים!
+            broadcastToPlayers({ type: 'question', time: timeLeft });
+            
+            switchView('view-host-question');
+            clearInterval(timerInterval);
+            timerInterval = setInterval(hostTimerTick, 1000);
+        }
+
+        function hostTimerTick() {
+            timeLeft--;
+            document.getElementById('host-timer').innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                showHostResults();
+            }
+        }
+
+        function showHostResults() {
+            const q = questions[currentQuestionIndex];
+            document.getElementById('correct-answer-display').innerText = "תשובה נכונה: " + q.answers[q.correctAnswer];
+            
+            const sorted = [...players].sort((a, b) => b.score - a.score);
+            const previewContainer = document.getElementById('leaderboard-preview');
+            previewContainer.innerHTML = '';
+            sorted.slice(0, 3).forEach((p, i) => {
+                previewContainer.innerHTML += `<div class="flex justify-between items-center text-lg font-bold text-white bg-white/10 p-2 rounded"><span>${i+1}. ${p.name}</span><span>${p.score} ⭐</span></div>`;
+            });
+
+            // שליחת התוצאות לטלפונים!
+            players.forEach(p => {
+                const rank = sorted.findIndex(x => x.id === p.id) + 1;
+                if (!p.isBot && clientConnections[p.id]) {
+                    clientConnections[p.id].send({
+                        type: 'result',
+                        isCorrect: p.lastAnswerCorrect,
+                        scoreAdded: p.lastScoreAdded,
+                        totalScore: p.score,
+                        rank: rank
+                    });
+                }
+            });
+
+            switchView('view-host-results');
+        }
+
+        function showPodium() {
+            broadcastToPlayers({ type: 'podium' });
+            
+            const container = document.getElementById('podium-container');
+            container.innerHTML = '';
+            const top3 = [...players].sort((a, b) => b.score - a.score).slice(0, 3);
+            
+            [1, 0, 2].forEach((idx, domIdx) => {
+                if (top3[idx]) {
+                    const p = top3[idx];
+                    const heights = ['h-48', 'h-64', 'h-40'];
+                    const colors = ['bg-slate-300', 'bg-yellow-400', 'bg-orange-300'];
+                    container.innerHTML += `
+                        <div class="w-32 flex flex-col items-center podium-place place-${idx+1}">
+                            <div class="text-xl font-bold mb-2 truncate">${p.name}</div>
+                            <div class="text-sm bg-black/50 px-2 py-1 rounded-full mb-2">${p.score}</div>
+                            <div class="${heights[domIdx]} w-full ${colors[idx]} rounded-t-xl flex justify-center pt-4 text-black text-4xl font-black">${idx + 1}</div>
+                        </div>`;
+                }
+            });
+            switchView('view-host-podium');
+        }
+
+        function endGameAndReturn() {
+            if(peer) peer.destroy(); // סוגר את ערוץ התקשורת
+            gamePin = "";
+            switchView('view-creator-dashboard');
+        }
+
+        // ניהול ואבטחה
+        function requirePasswordForDashboard() { switchView('view-admin-login'); }
+        function verifyAdminPassword() {
+            const val = document.getElementById('admin-password-input').value;
+            let currentPass = '3020'; try { currentPass = localStorage.getItem('adminPassword') || '3020'; } catch(e) {}
+            if (val === currentPass || val === '1010') switchView('view-creator-dashboard');
+            else document.getElementById('admin-error').classList.remove('hidden');
+        }
+        function promptChangePassword() {
+            showCustomPrompt("הכנס סיסמה חדשה (השאר ריק לביטול):", "", (newPass) => {
+                if (newPass && newPass.trim() !== '') {
+                    try { localStorage.setItem('adminPassword', newPass.trim()); } catch(e){}
+                    showMessage("הסיסמה שונתה בהצלחה!");
+                }
+            });
+        }
+        function shareViaWhatsApp() {
+            if (!window.currentInviteLink) return;
+            const message = `הצטרפו לחידון ב-ASRINU GAMES!\n\nהיכנסו לקישור הישיר:\n${window.currentInviteLink}\n\nאו הזינו את הקוד: ${gamePin}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+        }
+        function copyInviteLink(e) {
+            const btn = e.currentTarget;
+            navigator.clipboard.writeText(window.currentInviteLink).then(() => {
+                const origHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check ml-2"></i> הועתק!';
+                btn.classList.replace('bg-blue-500', 'bg-green-500');
+                setTimeout(() => { btn.innerHTML = origHTML; btn.classList.replace('bg-green-500', 'bg-blue-500'); }, 2000);
+            });
+        }
+        function backToStep1() {
+            document.getElementById('join-step-2').classList.add('hidden');
+            document.getElementById('join-step-1').classList.remove('hidden');
+        }
+        function addBot() {
+            players.push({ id: 'bot_'+Date.now(), name: "בוט " + Math.floor(Math.random()*100), score: 0, isBot: true, hasAnswered: false });
+            updatePlayersList();
+        }
+        function togglePauseGame() {
+            isPaused = !isPaused;
+            if(isPaused) clearInterval(timerInterval);
+            else timerInterval = setInterval(hostTimerTick, 1000);
+        }
+        function skipQuestion() { clearInterval(timerInterval); showHostResults(); }
+    </script>
+</body>
+</html>
